@@ -1,0 +1,105 @@
+{
+  "theme": "dark",
+  "archetype": "Archetype 5 (Luxury) + Archetype 2 (Performance Pro) Hybrid",
+  "domain": "Automotive Service / High-End",
+  "brand": {
+    "name": "El Punto Autoservices",
+    "address": "C/ Americo Lugo 198A, Santo Domingo, Dominican Republic",
+    "phone": "(809) 619-8595",
+    "hours": "Open Monday–Saturday, Closes at 6:00 PM"
+  },
+  "typography": {
+    "heading_font": "Cabinet Grotesk",
+    "body_font": "Manrope",
+    "rules": [
+      "No Inter, Roboto, or generic sans-serif for headings.",
+      "Headings must use tight letter spacing (tracking-tight or tracking-tighter).",
+      "Overlines/Labels must be Uppercase, Tiny, and Wide Spacing (tracking-[0.2em]).",
+      "Use clamp() or fluid scaling for H1 up to text-5xl/text-6xl max.",
+      "Do not exceed text-6xl for hero headings."
+    ]
+  },
+  "colors": {
+    "primary": "#111111",
+    "secondary": "#222222",
+    "accent": "#E10600",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#A1A1AA",
+    "background_base": "#0A0A0A",
+    "surface": "#1A1A1A",
+    "border": "#333333",
+    "rules": [
+      "Never use pure #000000. Use the tinted black (#0A0A0A or #111111).",
+      "Accent color (#E10600) is reserved for performance-driven interactions like CTAs, hover states, and active highlights. Do not overuse.",
+      "Hover state color must be a lighter/brighter hue of the active state color.",
+      "Ensure minimum 4.5:1 contrast ratio for normal text."
+    ]
+  },
+  "layout_and_spacing": {
+    "spacing_scale": "Use generous padding: p-6, p-8, p-12, p-16, p-24, p-32.",
+    "bento_grid": "Mode A: Tetris Grid for Marketing/Services. Asymmetry creates tension. Use grid-cols-1 md:grid-cols-12 with varied row/col spans (e.g., col-span-8, col-span-4).",
+    "alignment": "Always start grid-cols-1 on mobile. Left-align dense content. Optical alignment over mathematical alignment.",
+    "container_borders": "Containers with borders must have internal padding (p-6 or p-8)."
+  },
+  "surfaces": {
+    "headers": "Crystal Glass variant. bg-black/60 with backdrop-blur-xl and delicate 1px inner stroke (border-white/10).",
+    "dashboard_cards": "Flat background, 1px subtle border, no shadow. Hover: slight lift (-translate-y-1) and border color brightens.",
+    "tracing_beam": "Use glowing gradient lines tracing borders for high-conversion sections (like Booking or Pricing)."
+  },
+  "motion_and_interactions": {
+    "libraries": ["framer-motion", "lenis"],
+    "scroll": "Use Lenis for smooth momentum scrolling. It is mandatory for the premium feel.",
+    "hover_states": "All interactive elements must have clear hover and focus states.",
+    "entrance": "Staggered fade-up entrances for bento grid items using framer-motion."
+  },
+  "components_strategy": {
+    "marketing_sections": "ALWAYS use pure HTML + Tailwind CSS. Do not use Shadcn Card components for creative layouts.",
+    "interactive_logic": "ALWAYS use Shadcn for Booking Forms, Select, Calendar, Tabs, and Admin Dashboard logic. Heavily customize them to match the dark luxury aesthetic (strip Vercel look).",
+    "icons": "Use @phosphor-icons/react for high-end app feel (Duotone weight for marketing, Regular for dense UI)."
+  },
+  "accessibility_and_testing": {
+    "testing_attributes": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case (e.g., data-testid=\"call-now-button\").",
+    "contrast": "Meet APCA/WCAG AA standards.",
+    "motion": "Respect prefers-reduced-motion."
+  },
+  "media_urls": {
+    "hero": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/7de093c2-1cfe-4391-bafd-6a895ad834ac/images/f8e105c92b9761b65d5e22d2f6ff95d8a7ce3218d2b141e2313df35b3d081e05.png",
+      "description": "Hyper-realistic luxury sports car in a high-end, clean dark workshop with red LED accents. Use as full-bleed hero background with bg-black/50 overlay."
+    },
+    "service_diagnostics": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/7de093c2-1cfe-4391-bafd-6a895ad834ac/images/1df035380b7862862f157f5efff87afb529a7bd09526883bfaefd239b0630cca.png",
+      "description": "Mechanic holding a glowing diagnostic tablet next to a car engine. Use in Services or About section."
+    },
+    "about_workshop": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/7de093c2-1cfe-4391-bafd-6a895ad834ac/images/167f32d5cb7ec3a468258ab762e386c2f5d8fab27f30b1d88f61e8b8b118d944.png",
+      "description": "Professional high-end automotive workshop at night. Use as background for 'Why Choose Us' or 'About Us'."
+    },
+    "gallery": [
+      {
+        "url": "https://images.unsplash.com/photo-1618312980096-873bd19759a0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHw0fHxsdXh1cnklMjBjYXIlMjBzZXJ2aWNlJTIwd29ya3Nob3AlMjBkYXJrJTIwbGlnaHRpbmclMjBwcmVtaXVtJTIwbWVjaGFuaWN8ZW58MHx8fHwxNzgwMzQ0MzM2fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Red car on lift in dark lighting"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwyfHxsdXh1cnklMjBjYXIlMjBzZXJ2aWNlJTIwd29ya3Nob3AlMjBkYXJrJTIwbGlnaHRpbmclMjBwcmVtaXVtJTIwbWVjaGFuaWN8ZW58MHx8fHwxNzgwMzQ0MzM2fDA&ixlib=rb-4.1.0&q=85",
+        "description": "White luxury car in dark setting"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1618642624018-a370cbf3cd80?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBjYXIlMjBzZXJ2aWNlJTIwd29ya3Nob3AlMjBkYXJrJTIwbGlnaHRpbmclMjBwcmVtaXVtJTIwbWVjaGFuaWN8ZW58MHx8fHwxNzgwMzQ0MzM2fDA&ixlib=rb-4.1.0&q=85",
+        "description": "White Mercedes Benz coupe in premium workshop"
+      }
+    ],
+    "brand_logos_fallback": {
+      "instructions": "Use SVG icons for car brands (Toyota, Honda, Nissan, Ford, Chevrolet) from libraries like 'react-icons/si' (Simple Icons) or use text-based luxury typography for brands if SVGs are not perfectly matched. Alternatively, use standard text styling with high contrast."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install and use 'framer-motion' and 'lenis' for smooth scrolling.",
+    "Install '@phosphor-icons/react' for all iconography.",
+    "Use raw HTML/Tailwind for the landing page grid and bento layouts.",
+    "Use Shadcn components solely for the Booking Form, Calendar, and the Admin Panel.",
+    "Implement bilingual support (ES/EN) using a context provider or i18n library.",
+    "Ensure 'data-testid' is added to all buttons, links, form inputs, and language toggles.",
+    "Ensure the hero image has a dark gradient overlay (bg-gradient-to-r from-black/80 via-black/40 to-transparent) so text is highly legible."
+  ]
+}
