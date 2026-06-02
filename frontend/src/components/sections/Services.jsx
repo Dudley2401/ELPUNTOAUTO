@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
 import {
-  Activity, Drop, Disc, WaveTriangle, Gear, Lightning, ShieldCheck, Wrench, ArrowRight,
+  Engine, Drop, Disc, WaveTriangle, Gear, Lightning, ShieldCheck, Wrench, ArrowRight,
 } from "@phosphor-icons/react";
 import { useLang } from "@/contexts/LanguageContext";
 
 const ICONS = {
-  Activity, Droplet: Drop, Disc, Waves: WaveTriangle, Cog: Gear, Zap: Lightning, ShieldCheck, Wrench,
+  Activity: Engine, Droplet: Drop, Disc, Waves: WaveTriangle, Cog: Gear, Zap: Lightning, ShieldCheck, Wrench,
 };
 
 const SERVICES = [
