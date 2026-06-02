@@ -26,7 +26,9 @@ export default function Testimonials() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.08 }}
-              className="relative p-7 rounded-2xl bg-[#161617] border border-white/10 hover:border-[#E10600]/60 transition-colors"
+              whileHover={{ y: -6 }}
+              whileTap={{ scale: 0.98 }}
+              className="group relative p-7 rounded-2xl bg-[#161617] border border-white/10 hover:border-[#E10600]/60 active:border-[#E10600]/60 transition-colors cursor-pointer"
             >
               <Quotes size={32} weight="fill" className="text-[#E10600]/80" />
               <div className="flex gap-0.5 mt-3">

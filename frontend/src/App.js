@@ -23,7 +23,21 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
-  useEffect(() => { document.title = "El Punto Autoservices — Santo Domingo"; }, []);
+  useEffect(() => {
+    document.title = "El Punto Autoservices — Santo Domingo";
+    // Ripple position tracker
+    const handlePointer = (e) => {
+      const el = e.target.closest(".ripple");
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const clientX = e.clientX ?? e.touches?.[0]?.clientX ?? rect.left + rect.width / 2;
+      const clientY = e.clientY ?? e.touches?.[0]?.clientY ?? rect.top + rect.height / 2;
+      el.style.setProperty("--ripple-x", `${clientX - rect.left}px`);
+      el.style.setProperty("--ripple-y", `${clientY - rect.top}px`);
+    };
+    document.addEventListener("pointerdown", handlePointer, { passive: true });
+    return () => document.removeEventListener("pointerdown", handlePointer);
+  }, []);
   return (
     <LanguageProvider>
       <AuthProvider>

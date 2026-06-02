@@ -47,7 +47,7 @@ export default function Navbar() {
               key={l.id}
               data-testid={`nav-link-${l.id}`}
               href={`#${l.id}`}
-              className="text-sm uppercase tracking-[0.18em] text-white/70 hover:text-white transition"
+              className="magnetic-link text-sm uppercase tracking-[0.18em] text-white/70 hover:text-white transition"
             >
               {t(l.key)}
             </a>
@@ -65,9 +65,9 @@ export default function Navbar() {
           <a
             data-testid="navbar-call-button"
             href={`tel:${BUSINESS.phoneRaw}`}
-            className="hidden md:inline-flex items-center gap-2 btn-red text-white text-sm px-4 py-2 rounded-full font-medium"
+            className="group hidden md:inline-flex items-center gap-2 btn-red ripple text-white text-sm px-4 py-2 rounded-full font-medium"
           >
-            <Phone size={16} weight="bold" /> {t("nav.callNow")}
+            <Phone size={16} weight="bold" className="ring-on-hover" /> {t("nav.callNow")}
           </a>
           <button
             data-testid="mobile-menu-toggle"

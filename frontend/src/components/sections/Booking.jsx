@@ -157,9 +157,14 @@ export default function Booking() {
             type="submit"
             disabled={loading}
             data-testid="booking-submit"
-            className="mt-6 w-full btn-red rounded-full text-white font-medium py-4 text-base uppercase tracking-[0.18em] disabled:opacity-60"
+            className="group mt-6 w-full btn-red ripple rounded-full text-white font-medium py-4 text-base uppercase tracking-[0.18em] disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
-            {loading ? "…" : t("booking.submit")}
+            {loading ? "…" : (
+              <>
+                <span>{t("booking.submit")}</span>
+                <span className="arrow-slide inline-block">→</span>
+              </>
+            )}
           </button>
         </motion.form>
       </div>

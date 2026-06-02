@@ -34,15 +34,20 @@ export default function Gallery() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: i * 0.05 }}
-                className={`relative overflow-hidden rounded-xl group ${spans[i] || "col-span-2 lg:col-span-4"}`}
+                whileTap={{ scale: 0.98 }}
+                className={`img-zoom relative overflow-hidden rounded-xl group cursor-pointer ${spans[i] || "col-span-2 lg:col-span-4"}`}
               >
                 <img
                   src={src}
                   alt={`Workshop ${i + 1}`}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  className="absolute inset-0 w-full h-full object-cover"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300" />
+                <div className="absolute bottom-4 left-4 right-4 translate-y-4 group-hover:translate-y-0 group-active:translate-y-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all duration-300">
+                  <div className="text-[10px] uppercase tracking-[0.3em] text-white/60">El Punto</div>
+                  <div className="text-sm text-white font-medium">Vista del taller</div>
+                </div>
               </motion.div>
             );
           })}

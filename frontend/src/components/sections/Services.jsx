@@ -61,17 +61,19 @@ export default function Services() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.5, delay: (i % 4) * 0.07 }}
-                className="group relative bg-[#0F0F10] p-7 lg:p-8 hover:bg-[#161617] transition-colors min-h-[230px] flex flex-col"
+                whileTap={{ scale: 0.97 }}
+                className="group relative bg-[#0F0F10] p-7 lg:p-8 hover:bg-[#161617] active:bg-[#161617] transition-colors duration-300 min-h-[230px] flex flex-col cursor-pointer overflow-hidden"
               >
-                <div className="w-12 h-12 rounded-xl bg-[#E10600]/10 grid place-items-center text-[#E10600] group-hover:bg-[#E10600] group-hover:text-white transition">
+                <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-[#E10600] opacity-0 group-hover:opacity-15 group-active:opacity-15 blur-2xl transition-opacity duration-500" />
+                <div className="w-12 h-12 rounded-xl bg-[#E10600]/10 grid place-items-center text-[#E10600] group-hover:bg-[#E10600] group-hover:text-white group-active:bg-[#E10600] group-active:text-white transition-all duration-300 group-hover:scale-110 group-hover:rotate-3">
                   {Icon ? <Icon size={26} weight="duotone" /> : null}
                 </div>
-                <div className="mt-6 font-display text-xl tracking-wide">{data.name}</div>
+                <div className="mt-6 font-display text-xl tracking-wide group-hover:translate-x-1 group-active:translate-x-1 transition-transform duration-300">{data.name}</div>
                 <p className="mt-2 text-sm text-white/55 leading-relaxed flex-1">{data.desc}</p>
-                <div className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-white/70 group-hover:text-[#E10600] transition">
-                  {t("services.cta")} <ArrowRight size={14} />
+                <div className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-white/70 group-hover:text-[#E10600] group-active:text-[#E10600] transition">
+                  {t("services.cta")} <ArrowRight size={14} className="arrow-slide" />
                 </div>
-                <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#E10600]/60 to-transparent opacity-0 group-hover:opacity-100 transition" />
+                <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#E10600]/60 to-transparent opacity-0 group-hover:opacity-100 group-active:opacity-100 transition" />
               </motion.a>
             );
           })}

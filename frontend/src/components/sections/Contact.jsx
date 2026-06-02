@@ -42,7 +42,7 @@ export default function Contact() {
         <div className="grid lg:grid-cols-12 gap-6">
           {/* Map + info */}
           <div className="lg:col-span-7 space-y-6">
-            <div className="aspect-[16/10] rounded-2xl overflow-hidden border border-white/10 relative">
+            <div className="map-frame aspect-[16/10] rounded-2xl overflow-hidden border border-white/10 relative group cursor-pointer" onClick={() => window.open(mapsUrl, "_blank")}>
               <iframe
                 title="Map"
                 src={embedUrl}
@@ -53,7 +53,13 @@ export default function Contact() {
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 data-testid="google-map"
+                className="pointer-events-none"
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300 flex items-end justify-end p-5">
+                <span className="inline-flex items-center gap-2 bg-[#E10600] text-white px-4 py-2 rounded-full text-xs uppercase tracking-[0.16em] font-medium translate-y-2 group-hover:translate-y-0 group-active:translate-y-0 transition-transform">
+                  <ArrowUpRight size={14} weight="bold" /> Abrir en Maps
+                </span>
+              </div>
             </div>
 
             <div className="grid sm:grid-cols-3 gap-3">
@@ -119,11 +125,11 @@ function InfoTile({ icon: Icon, label, value, link, testid }) {
     <Wrapper
       data-testid={testid}
       {...wrapProps}
-      className="group rounded-xl border border-white/10 bg-[#0F0F10] p-5 hover:border-[#E10600]/50 transition flex flex-col gap-2"
+      className="group tactile rounded-xl border border-white/10 bg-[#0F0F10] p-5 hover:border-[#E10600]/50 flex flex-col gap-2"
     >
       <div className="flex items-center justify-between">
-        <Icon size={20} weight="duotone" className="text-[#E10600]" />
-        {link ? <ArrowUpRight size={16} className="text-white/30 group-hover:text-white transition" /> : null}
+        <Icon size={20} weight="duotone" className="text-[#E10600] ring-on-hover" />
+        {link ? <ArrowUpRight size={16} className="text-white/30 group-hover:text-white group-active:text-white arrow-slide" /> : null}
       </div>
       <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">{label}</div>
       <div className="text-sm text-white/90 leading-snug">{value}</div>

@@ -63,9 +63,9 @@ export default function Hero() {
           <a
             data-testid="hero-call-button"
             href={`tel:${BUSINESS.phoneRaw}`}
-            className="btn-red inline-flex items-center justify-center gap-3 px-7 py-4 rounded-full text-white font-medium text-base"
+            className="group btn-red ripple inline-flex items-center justify-center gap-3 px-7 py-4 rounded-full text-white font-medium text-base pulse-ring"
           >
-            <Phone size={20} weight="bold" />
+            <Phone size={20} weight="bold" className="ring-on-hover" />
             {t("hero.ctaCall")} · {BUSINESS.phone}
           </a>
           <a
@@ -73,17 +73,17 @@ export default function Hero() {
             href={mapsUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center justify-center gap-3 px-7 py-4 rounded-full border border-white/25 text-white hover:bg-white/10 transition backdrop-blur-md"
+            className="group tactile inline-flex items-center justify-center gap-3 px-7 py-4 rounded-full border border-white/25 text-white hover:bg-white/10 hover:border-white/60 backdrop-blur-md"
           >
-            <MapPin size={20} weight="bold" />
+            <MapPin size={20} weight="bold" className="ring-on-hover" />
             {t("hero.ctaDirections")}
           </a>
           <a
             data-testid="hero-book-button"
             href="#booking"
-            className="inline-flex items-center justify-center gap-2 px-5 py-4 text-white/80 hover:text-white text-sm uppercase tracking-[0.18em]"
+            className="group inline-flex items-center justify-center gap-2 px-5 py-4 text-white/80 hover:text-white text-sm uppercase tracking-[0.18em]"
           >
-            {t("hero.ctaBook")} <ArrowRight size={16} />
+            <span className="magnetic-link">{t("hero.ctaBook")}</span> <ArrowRight size={16} className="arrow-slide" />
           </a>
         </motion.div>
 
@@ -99,16 +99,30 @@ export default function Hero() {
             { v: t("hero.stats2"), l: t("hero.stats2l") },
             { v: t("hero.stats3"), l: t("hero.stats3l") },
           ].map((s, i) => (
-            <div key={i}>
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.8 + i * 0.15, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ y: -4 }}
+              className="cursor-default"
+            >
               <div className="font-display text-3xl lg:text-4xl text-white">{s.v}</div>
               <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-white/50 mt-1">{s.l}</div>
-            </div>
+            </motion.div>
           ))}
         </motion.div>
       </div>
 
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.4em] text-white/40">
-        ↓ Scroll
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.4em] text-white/40 hidden sm:block">
+        <span className="inline-flex flex-col items-center gap-2">
+          <span>Scroll</span>
+          <motion.span
+            className="block w-px h-8 bg-white/30"
+            animate={{ scaleY: [0.3, 1, 0.3], originY: [0, 0, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </span>
       </div>
     </section>
   );

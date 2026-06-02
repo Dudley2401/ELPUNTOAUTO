@@ -119,3 +119,155 @@ input:-webkit-autofill, textarea:-webkit-autofill {
     -webkit-text-fill-color: #fff !important;
     caret-color: #fff;
 }
+
+/* ============================================================
+   PREMIUM INTERACTIONS — works on hover (desktop) AND tap (mobile)
+   ============================================================ */
+
+/* Tactile press feedback: works on hover and active */
+.tactile {
+    transition: transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s ease, border-color .25s ease, background-color .25s ease;
+}
+.tactile:hover { transform: translateY(-3px); }
+.tactile:active { transform: translateY(0) scale(0.97); transition-duration: .1s; }
+
+/* Pulse ring for primary CTAs */
+@keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(225, 6, 0, 0.5); }
+    70% { box-shadow: 0 0 0 14px rgba(225, 6, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(225, 6, 0, 0); }
+}
+.pulse-ring { animation: pulse-ring 2.4s ease-out infinite; }
+
+/* Subtle vibrate / ring icon — used for the phone icon */
+@keyframes ring-shake {
+    0%, 100% { transform: rotate(0); }
+    10%, 30%, 50% { transform: rotate(-12deg); }
+    20%, 40%, 60% { transform: rotate(12deg); }
+    70% { transform: rotate(-6deg); }
+    80% { transform: rotate(6deg); }
+}
+.group:hover .ring-on-hover,
+.group:active .ring-on-hover {
+    animation: ring-shake .6s ease-in-out;
+    transform-origin: 50% 30%;
+}
+
+/* Arrow slide */
+.group:hover .arrow-slide,
+.group:active .arrow-slide {
+    transform: translateX(4px);
+}
+.arrow-slide { transition: transform .25s cubic-bezier(.22,1,.36,1); }
+
+/* Magnetic underline */
+.magnetic-link { position: relative; }
+.magnetic-link::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: -4px;
+    height: 2px; width: 100%;
+    background: #E10600;
+    transform: scaleX(0);
+    transform-origin: right center;
+    transition: transform .35s cubic-bezier(.22,1,.36,1);
+}
+.magnetic-link:hover::after,
+.magnetic-link:focus::after {
+    transform: scaleX(1);
+    transform-origin: left center;
+}
+
+/* Floating idle for WhatsApp button */
+@keyframes float-y {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+.float-idle { animation: float-y 3.2s ease-in-out infinite; }
+
+/* Ripple effect on tap */
+.ripple { position: relative; overflow: hidden; }
+.ripple::before {
+    content: "";
+    position: absolute;
+    top: var(--ripple-y, 50%);
+    left: var(--ripple-x, 50%);
+    width: 0; height: 0;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.35);
+    transform: translate(-50%, -50%);
+    transition: width .6s ease, height .6s ease, opacity .8s ease;
+    opacity: 0;
+    pointer-events: none;
+}
+.ripple:active::before {
+    width: 300px; height: 300px; opacity: 1;
+    transition: width 0s, height 0s, opacity 0s;
+}
+
+/* Tilt on image cards (subtle 3D) */
+.tilt {
+    transition: transform .5s cubic-bezier(.22,1,.36,1), box-shadow .5s ease;
+    transform-style: preserve-3d;
+}
+.tilt:hover {
+    transform: translateY(-6px) rotateX(2deg) rotateY(-2deg);
+    box-shadow: 0 30px 60px -25px rgba(225,6,0,0.35);
+}
+
+/* Image zoom on hover/tap */
+.img-zoom { overflow: hidden; }
+.img-zoom img,
+.img-zoom .img-target {
+    transition: transform .9s cubic-bezier(.22,1,.36,1), filter .5s ease;
+}
+.img-zoom:hover img,
+.img-zoom:active img,
+.img-zoom:hover .img-target,
+.img-zoom:active .img-target {
+    transform: scale(1.07);
+}
+
+/* Glow on focus inputs */
+input:focus, textarea:focus, select:focus {
+    box-shadow: 0 0 0 4px rgba(225, 6, 0, 0.12);
+    transition: box-shadow .25s ease, border-color .25s ease;
+}
+
+/* Count-up scroll reveal helper (stats) */
+@keyframes stat-pop {
+    0% { transform: translateY(20px); opacity: 0; }
+    60% { transform: translateY(-3px); opacity: 1; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+.stat-pop { animation: stat-pop .9s cubic-bezier(.22,1,.36,1) both; }
+
+/* Gradient sweep for primary CTAs (reinforces existing .btn-red) */
+.btn-red:active { transform: translateY(0) scale(0.97); }
+
+/* Hover lift for map */
+.map-frame {
+    transition: transform .5s cubic-bezier(.22,1,.36,1), box-shadow .5s ease, border-color .35s ease;
+}
+.map-frame:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 30px 80px -30px rgba(225, 6, 0, 0.4);
+    border-color: rgba(225, 6, 0, 0.4) !important;
+}
+
+/* Tap-only highlight feedback (mobile) */
+@media (hover: none) {
+    .tactile:active { transform: scale(0.96); }
+    .pulse-ring { animation-duration: 3s; }
+    /* Disable hover-only animations on mobile to avoid stuck states */
+    .group:hover .ring-on-hover { animation: none; }
+}
+
+/* Respect user preference */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
