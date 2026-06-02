@@ -15,6 +15,10 @@ const SERVICE_KEYS = [
   { id: "electrical", es: "Sistema Eléctrico", en: "Electrical Repairs" },
   { id: "preventive", es: "Mantenimiento Preventivo", en: "Preventive Maintenance" },
   { id: "general-repair", es: "Reparación General", en: "General Auto Repair" },
+  { id: "alignment", es: "Alineación y Balanceo", en: "Wheel Alignment" },
+  { id: "ac-service", es: "Aire Acondicionado", en: "A/C Service" },
+  { id: "tires", es: "Cambio de Neumáticos", en: "Tire Service" },
+  { id: "body-paint", es: "Latonería y Pintura", en: "Body & Paint" },
 ];
 
 const todayISO = () => {

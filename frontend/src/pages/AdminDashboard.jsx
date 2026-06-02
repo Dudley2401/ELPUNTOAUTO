@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
-  SignOut, Calendar, ChatCircleText, TrendUp, Trash, ArrowLeft, Wrench, Plus, PencilSimple, X, Check, Receipt,
+  SignOut, Calendar, ChatCircleText, TrendUp, Trash, ArrowLeft, Wrench, Plus, PencilSimple, X, Check, Receipt, Package,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LanguageContext";
 import { api, formatApiErrorDetail } from "@/lib/api";
 import InvoiceModal from "@/components/InvoiceModal";
+import InventoryPanel from "@/components/InventoryPanel";
 
 const STATUS_COLOR = {
   new: "bg-[#E10600]/15 text-[#FF6B65] border-[#E10600]/40",
@@ -142,6 +143,9 @@ export default function AdminDashboard() {
           <TabBtn id="technicians" active={tab === "technicians"} onClick={() => setTab("technicians")} count={techs.length}>
             Técnicos
           </TabBtn>
+          <TabBtn id="inventory" active={tab === "inventory"} onClick={() => setTab("inventory")}>
+            <span className="inline-flex items-center gap-1.5"><Package size={14} weight="duotone" /> Inventario</span>
+          </TabBtn>
         </div>
 
         {loading ? (
@@ -150,8 +154,10 @@ export default function AdminDashboard() {
           <AppointmentsTable appts={appts} techs={techs} onStatus={updateApptStatus} onDelete={deleteAppt} onAssign={assignTech} onInvoice={setInvoiceFor} t={t} />
         ) : tab === "messages" ? (
           <MessagesTable contacts={contacts} onStatus={updateContactStatus} onDelete={deleteContact} t={t} />
-        ) : (
+        ) : tab === "technicians" ? (
           <TechniciansPanel techs={techs} onChanged={load} />
+        ) : (
+          <InventoryPanel />
         )}
       </main>
 
@@ -427,7 +433,7 @@ function TabBtn({ active, onClick, children, count, id }) {
         active ? "border-[#E10600] text-white" : "border-transparent text-white/50 hover:text-white"
       }`}
     >
-      {children} <span className="ml-2 text-xs text-white/40">{count}</span>
+      {children} {count !== undefined ? <span className="ml-2 text-xs text-white/40">{count}</span> : null}
     </button>
   );
 }

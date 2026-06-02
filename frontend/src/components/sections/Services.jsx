@@ -1,11 +1,13 @@
 import { motion } from "framer-motion";
 import {
   Engine, Drop, Disc, WaveTriangle, Gear, Lightning, ShieldCheck, Wrench, ArrowRight,
+  ArrowsLeftRight, Snowflake, Tire, PaintBrush,
 } from "@phosphor-icons/react";
 import { useLang } from "@/contexts/LanguageContext";
 
 const ICONS = {
   Activity: Engine, Droplet: Drop, Disc, Waves: WaveTriangle, Cog: Gear, Zap: Lightning, ShieldCheck, Wrench,
+  Alignment: ArrowsLeftRight, Snow: Snowflake, Tires: Tire, Brush: PaintBrush,
 };
 
 const SERVICES = [
@@ -33,6 +35,18 @@ const SERVICES = [
   { id: "general-repair", icon: "Wrench",
     es: { name: "Reparación General", desc: "Mecánica integral con técnicos certificados y garantía." },
     en: { name: "General Auto Repair", desc: "Full-service mechanics with certified technicians." } },
+  { id: "alignment", icon: "Alignment",
+    es: { name: "Alineación y Balanceo", desc: "Computarizada 3D. Mejora estabilidad y vida útil de neumáticos." },
+    en: { name: "Wheel Alignment", desc: "Computerized 3D. Better stability and longer tire life." } },
+  { id: "ac-service", icon: "Snow",
+    es: { name: "Aire Acondicionado", desc: "Recarga de gas, diagnóstico de fugas y mantenimiento completo." },
+    en: { name: "A/C Service", desc: "Gas recharge, leak detection and complete maintenance." } },
+  { id: "tires", icon: "Tires",
+    es: { name: "Cambio de Neumáticos", desc: "Marcas premium, montaje, balanceo y válvulas nuevas." },
+    en: { name: "Tire Service", desc: "Premium brands, mounting, balancing and new valves." } },
+  { id: "body-paint", icon: "Brush",
+    es: { name: "Latonería y Pintura", desc: "Reparación de carrocería y pintura horneada profesional." },
+    en: { name: "Body & Paint", desc: "Professional body repair and oven-baked paint finish." } },
 ];
 
 export default function Services() {

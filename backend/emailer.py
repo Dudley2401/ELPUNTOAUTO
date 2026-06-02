@@ -306,3 +306,27 @@ async def send_invoice_email(invoice: dict, public_url: str) -> None:
     await _send(invoice["client_email"], f"Factura {invoice['number']} — El Punto Autoservices", html)
     if ADMIN_NOTIFY:
         await _send(ADMIN_NOTIFY, f"[Copia Admin] Factura enviada — {invoice['number']}", html)
+
+
+# ---------- INVENTORY ALERTS ----------
+async def send_low_stock_alert(product: dict) -> None:
+    if not ADMIN_NOTIFY:
+        return
+    rows = (
+        _info_row("Producto", f"<b style='color:#fff;'>{product['name']}</b>")
+        + (_info_row("SKU", product["sku"]) if product.get("sku") else "")
+        + _info_row("Categoría", product.get("category", "general"))
+        + _info_row("Stock actual", f"<span style='color:#FF6B65;font-weight:700;'>{product['current_stock']:g} {product.get('unit','')}</span>")
+        + _info_row("Mínimo", f"{product['min_stock']:g} {product.get('unit','')}")
+    )
+    intro = (
+        "⚠️ <b style='color:#FF6B65;'>El stock está por debajo del mínimo configurado.</b> "
+        "Considera realizar una compra para reabastecer este producto."
+    )
+    html = _wrapper(
+        title="Alerta de inventario bajo",
+        intro=intro,
+        content_html=_details_table(rows),
+        footer_note="Esta alerta se envió automáticamente desde tu panel de inventario.",
+    )
+    await _send(ADMIN_NOTIFY, f"🚨 Stock bajo: {product['name']}", html)

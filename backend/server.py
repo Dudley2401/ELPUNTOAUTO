@@ -240,6 +240,53 @@ class InvoiceStatusUpdate(BaseModel):
     status: Literal["draft", "sent", "paid", "cancelled"]
 
 
+# ------ Products / Inventory ------
+class ProductIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = Field(min_length=1, max_length=200)
+    sku: str = Field(default="", max_length=80)
+    category: str = Field(default="general", max_length=80)
+    unit: str = Field(default="unidad", max_length=40)
+    cost: float = Field(default=0, ge=0)
+    price: float = Field(default=0, ge=0)
+    current_stock: float = Field(default=0, ge=0)
+    min_stock: float = Field(default=0, ge=0)
+    notes: str = Field(default="", max_length=500)
+
+
+class ProductOut(BaseModel):
+    id: str
+    name: str
+    sku: str
+    category: str
+    unit: str
+    cost: float
+    price: float
+    current_stock: float
+    min_stock: float
+    notes: str
+    low_stock: bool
+    created_at: str
+    updated_at: str
+
+
+class StockMovementIn(BaseModel):
+    quantity: float = Field(gt=0)
+    note: str = Field(default="", max_length=300)
+    unit_cost: Optional[float] = Field(default=None, ge=0)
+
+
+class StockMovementOut(BaseModel):
+    id: str
+    product_id: str
+    product_name: str
+    type: str  # restock | use | adjustment
+    quantity: float
+    unit_cost: Optional[float] = None
+    note: str
+    created_at: str
+
+
 def _compute_invoice_totals(items: List[dict], tax_rate: float, discount: float) -> tuple:
     items_out = []
     subtotal = 0.0
@@ -657,6 +704,9 @@ async def startup() -> None:
     await db.technicians.create_index("created_at")
     await db.invoices.create_index("created_at")
     await db.invoices.create_index("appointment_id")
+    await db.products.create_index("name")
+    await db.stock_movements.create_index("product_id")
+    await db.stock_movements.create_index("created_at")
     await seed_admin()
 
 
