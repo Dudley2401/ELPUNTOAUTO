@@ -1,0 +1,82 @@
+import { motion } from "framer-motion";
+import {
+  Activity, Drop, Disc, WaveTriangle, Gear, Lightning, ShieldCheck, Wrench, ArrowRight,
+} from "@phosphor-icons/react";
+import { useLang } from "@/contexts/LanguageContext";
+
+const ICONS = {
+  Activity, Droplet: Drop, Disc, Waves: WaveTriangle, Cog: Gear, Zap: Lightning, ShieldCheck, Wrench,
+};
+
+const SERVICES = [
+  { id: "engine-diagnostics", icon: "Activity",
+    es: { name: "Diagnóstico de Motor", desc: "Escaneo computarizado avanzado para detectar fallas con precisión." },
+    en: { name: "Engine Diagnostics", desc: "Advanced computerized scans to detect faults with precision." } },
+  { id: "oil-change", icon: "Droplet",
+    es: { name: "Cambio de Aceite", desc: "Aceites sintéticos premium y filtros originales." },
+    en: { name: "Oil Changes", desc: "Premium synthetic oils and OEM filters." } },
+  { id: "brake-service", icon: "Disc",
+    es: { name: "Servicio de Frenos", desc: "Pastillas, discos y líquido. Tu seguridad es prioridad." },
+    en: { name: "Brake Service", desc: "Pads, rotors and fluid. Your safety is our priority." } },
+  { id: "suspension", icon: "Waves",
+    es: { name: "Suspensión", desc: "Amortiguadores, bujes y alineación para un manejo perfecto." },
+    en: { name: "Suspension Repair", desc: "Shocks, bushings and alignment for a perfect ride." } },
+  { id: "transmission", icon: "Cog",
+    es: { name: "Transmisión", desc: "Reparación y mantenimiento de cajas automáticas y manuales." },
+    en: { name: "Transmission Service", desc: "Repair and service of automatic and manual transmissions." } },
+  { id: "electrical", icon: "Zap",
+    es: { name: "Sistema Eléctrico", desc: "Alternador, batería, arranque y diagnóstico completo." },
+    en: { name: "Electrical Repairs", desc: "Alternator, battery, starter and full electrical diagnostics." } },
+  { id: "preventive", icon: "ShieldCheck",
+    es: { name: "Mantenimiento Preventivo", desc: "Planes a la medida para extender la vida de tu vehículo." },
+    en: { name: "Preventive Maintenance", desc: "Tailored plans to extend the life of your vehicle." } },
+  { id: "general-repair", icon: "Wrench",
+    es: { name: "Reparación General", desc: "Mecánica integral con técnicos certificados y garantía." },
+    en: { name: "General Auto Repair", desc: "Full-service mechanics with certified technicians." } },
+];
+
+export default function Services() {
+  const { t, lang } = useLang();
+  return (
+    <section id="services" data-testid="services-section" className="relative py-24 lg:py-32 bg-[#0A0A0A]">
+      <div className="max-w-7xl mx-auto px-5 lg:px-10">
+        <div className="max-w-3xl mb-14 lg:mb-20">
+          <div className="text-xs uppercase tracking-[0.4em] text-[#E10600] mb-4">{t("services.eyebrow")}</div>
+          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
+            {t("services.title")}
+          </h2>
+          <p className="mt-5 text-white/60 max-w-2xl">{t("services.subtitle")}</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+          {SERVICES.map((s, i) => {
+            const Icon = ICONS[s.icon];
+            const data = s[lang];
+            return (
+              <motion.a
+                key={s.id}
+                href="#booking"
+                data-testid={`service-card-${s.id}`}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.5, delay: (i % 4) * 0.07 }}
+                className="group relative bg-[#0F0F10] p-7 lg:p-8 hover:bg-[#161617] transition-colors min-h-[230px] flex flex-col"
+              >
+                <div className="w-12 h-12 rounded-xl bg-[#E10600]/10 grid place-items-center text-[#E10600] group-hover:bg-[#E10600] group-hover:text-white transition">
+                  {Icon ? <Icon size={26} weight="duotone" /> : null}
+                </div>
+                <div className="mt-6 font-display text-xl tracking-wide">{data.name}</div>
+                <p className="mt-2 text-sm text-white/55 leading-relaxed flex-1">{data.desc}</p>
+                <div className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-white/70 group-hover:text-[#E10600] transition">
+                  {t("services.cta")} <ArrowRight size={14} />
+                </div>
+                <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#E10600]/60 to-transparent opacity-0 group-hover:opacity-100 transition" />
+              </motion.a>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
