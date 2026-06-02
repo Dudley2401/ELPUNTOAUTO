@@ -12,10 +12,12 @@ import jwt
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, BackgroundTasks
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
+
+import emailer
 
 # ------------------------------------------------------------
 # Config
@@ -197,7 +199,7 @@ async def list_services():
 
 
 @api.post("/contact", response_model=ContactOut)
-async def create_contact(payload: ContactIn):
+async def create_contact(payload: ContactIn, background: BackgroundTasks):
     doc = {
         "id": str(uuid.uuid4()),
         "name": payload.name.strip(),
@@ -208,11 +210,13 @@ async def create_contact(payload: ContactIn):
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.contacts.insert_one(doc)
+    background.add_task(emailer.send_contact_created_client, doc)
+    background.add_task(emailer.send_contact_created_admin, doc)
     return ContactOut(**doc)
 
 
 @api.post("/appointments", response_model=AppointmentOut)
-async def create_appointment(payload: AppointmentIn):
+async def create_appointment(payload: AppointmentIn, background: BackgroundTasks):
     doc = {
         "id": str(uuid.uuid4()),
         "name": payload.name.strip(),
@@ -227,6 +231,8 @@ async def create_appointment(payload: AppointmentIn):
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.appointments.insert_one(doc)
+    background.add_task(emailer.send_appointment_created_client, doc)
+    background.add_task(emailer.send_appointment_created_admin, doc)
     return AppointmentOut(**doc)
 
 
@@ -299,10 +305,13 @@ async def list_appointments(admin=Depends(get_current_admin)):
 
 
 @api.patch("/admin/appointments/{appt_id}")
-async def update_appointment(appt_id: str, body: StatusUpdate, admin=Depends(get_current_admin)):
+async def update_appointment(appt_id: str, body: StatusUpdate, background: BackgroundTasks, admin=Depends(get_current_admin)):
     res = await db.appointments.update_one({"id": appt_id}, {"$set": {"status": body.status}})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
+    appt = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
+    if appt:
+        background.add_task(emailer.send_appointment_status_update, appt, body.status)
     return {"ok": True}
 
 
