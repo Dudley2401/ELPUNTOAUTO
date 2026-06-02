@@ -6,6 +6,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import Home from "@/pages/Home";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
+import InvoicePublic from "@/pages/InvoicePublic";
 import "@/App.css";
 
 function ProtectedRoute({ children }) {
@@ -30,6 +31,7 @@ function App() {
           <Toaster theme="dark" position="top-center" richColors />
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/invoice/:id" element={<InvoicePublic />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />

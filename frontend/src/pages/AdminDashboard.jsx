@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
-  SignOut, Calendar, ChatCircleText, TrendUp, Trash, ArrowLeft, Wrench, Plus, PencilSimple, X, Check,
+  SignOut, Calendar, ChatCircleText, TrendUp, Trash, ArrowLeft, Wrench, Plus, PencilSimple, X, Check, Receipt,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LanguageContext";
 import { api, formatApiErrorDetail } from "@/lib/api";
+import InvoiceModal from "@/components/InvoiceModal";
 
 const STATUS_COLOR = {
   new: "bg-[#E10600]/15 text-[#FF6B65] border-[#E10600]/40",
@@ -29,6 +30,7 @@ export default function AdminDashboard() {
   const [contacts, setContacts] = useState([]);
   const [techs, setTechs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [invoiceFor, setInvoiceFor] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -145,18 +147,26 @@ export default function AdminDashboard() {
         {loading ? (
           <div className="py-20 text-center text-white/40 text-sm uppercase tracking-[0.3em]">Loading…</div>
         ) : tab === "appointments" ? (
-          <AppointmentsTable appts={appts} techs={techs} onStatus={updateApptStatus} onDelete={deleteAppt} onAssign={assignTech} t={t} />
+          <AppointmentsTable appts={appts} techs={techs} onStatus={updateApptStatus} onDelete={deleteAppt} onAssign={assignTech} onInvoice={setInvoiceFor} t={t} />
         ) : tab === "messages" ? (
           <MessagesTable contacts={contacts} onStatus={updateContactStatus} onDelete={deleteContact} t={t} />
         ) : (
           <TechniciansPanel techs={techs} onChanged={load} />
         )}
       </main>
+
+      {invoiceFor && (
+        <InvoiceModal
+          appointment={invoiceFor}
+          onClose={() => setInvoiceFor(null)}
+          onSaved={load}
+        />
+      )}
     </div>
   );
 }
 
-function AppointmentsTable({ appts, techs, onStatus, onDelete, onAssign, t }) {
+function AppointmentsTable({ appts, techs, onStatus, onDelete, onAssign, onInvoice, t }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-white/10">
       <table className="w-full text-sm min-w-[1100px]">
@@ -206,9 +216,14 @@ function AppointmentsTable({ appts, techs, onStatus, onDelete, onAssign, t }) {
                 </select>
               </Td>
               <Td>
-                <button data-testid={`appt-delete-${a.id}`} onClick={() => onDelete(a.id)} className="text-white/40 hover:text-[#E10600] transition">
-                  <Trash size={16} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button data-testid={`appt-invoice-${a.id}`} onClick={() => onInvoice(a)} title="Factura" className="text-white/40 hover:text-[#E10600] transition p-1">
+                    <Receipt size={16} weight="duotone" />
+                  </button>
+                  <button data-testid={`appt-delete-${a.id}`} onClick={() => onDelete(a.id)} title="Eliminar" className="text-white/40 hover:text-[#E10600] transition p-1">
+                    <Trash size={16} />
+                  </button>
+                </div>
               </Td>
             </tr>
           ))}

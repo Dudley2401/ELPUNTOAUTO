@@ -219,3 +219,90 @@ async def send_contact_created_admin(contact: dict) -> None:
         content_html=_details_table(rows),
     )
     await _send(ADMIN_NOTIFY, f"Nuevo mensaje: {contact['name']}", html)
+
+
+# ---------- INVOICE EMAILS ----------
+def _format_money(v: float) -> str:
+    return f"RD${v:,.2f}"
+
+
+def _invoice_items_html(items: list) -> str:
+    rows = ""
+    for it in items:
+        rows += (
+            f'<tr>'
+            f'<td style="padding:10px 14px;border-bottom:1px solid #1f1f1f;color:#fff;font-size:13px;">{it["description"]}</td>'
+            f'<td style="padding:10px 14px;border-bottom:1px solid #1f1f1f;color:#A1A1AA;font-size:13px;text-align:center;">{it["quantity"]:g}</td>'
+            f'<td style="padding:10px 14px;border-bottom:1px solid #1f1f1f;color:#A1A1AA;font-size:13px;text-align:right;">{_format_money(it["unit_price"])}</td>'
+            f'<td style="padding:10px 14px;border-bottom:1px solid #1f1f1f;color:#fff;font-size:13px;text-align:right;font-weight:600;">{_format_money(it["total"])}</td>'
+            f'</tr>'
+        )
+    return rows
+
+
+async def send_invoice_email(invoice: dict, public_url: str) -> None:
+    items_rows = _invoice_items_html(invoice["items"]) or (
+        '<tr><td colspan="4" style="padding:14px;color:#71717A;font-size:13px;text-align:center;">Sin items</td></tr>'
+    )
+    discount_row = ""
+    if invoice.get("discount", 0) > 0:
+        discount_row = (
+            f'<tr><td colspan="3" style="padding:6px 14px;color:#A1A1AA;font-size:13px;text-align:right;">Descuento</td>'
+            f'<td style="padding:6px 14px;color:#fff;font-size:13px;text-align:right;">- {_format_money(invoice["discount"])}</td></tr>'
+        )
+    work_block = ""
+    if invoice.get("work_performed"):
+        work_block = (
+            '<div style="margin:18px 0 10px;padding:14px 16px;background:#0A0A0A;border:1px solid #222;border-radius:10px;">'
+            '<div style="color:#71717A;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;margin-bottom:6px;">Trabajo realizado</div>'
+            f'<div style="color:#fff;font-size:13px;line-height:1.6;white-space:pre-wrap;">{invoice["work_performed"]}</div>'
+            '</div>'
+        )
+
+    content = f'''
+{work_block}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0A;border:1px solid #222;border-radius:10px;overflow:hidden;margin-top:8px;">
+  <thead>
+    <tr style="background:#161617;">
+      <th style="padding:10px 14px;text-align:left;color:#71717A;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">Descripción</th>
+      <th style="padding:10px 14px;text-align:center;color:#71717A;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">Cant.</th>
+      <th style="padding:10px 14px;text-align:right;color:#71717A;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">Precio</th>
+      <th style="padding:10px 14px;text-align:right;color:#71717A;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">Total</th>
+    </tr>
+  </thead>
+  <tbody>{items_rows}</tbody>
+  <tfoot>
+    <tr><td colspan="3" style="padding:8px 14px;color:#A1A1AA;font-size:13px;text-align:right;border-top:1px solid #222;">Subtotal</td>
+        <td style="padding:8px 14px;color:#fff;font-size:13px;text-align:right;border-top:1px solid #222;">{_format_money(invoice["subtotal"])}</td></tr>
+    {discount_row}
+    <tr><td colspan="3" style="padding:6px 14px;color:#A1A1AA;font-size:13px;text-align:right;">ITBIS ({invoice["tax_rate"]*100:.0f}%)</td>
+        <td style="padding:6px 14px;color:#fff;font-size:13px;text-align:right;">{_format_money(invoice["tax_amount"])}</td></tr>
+    <tr><td colspan="3" style="padding:14px 14px 16px;color:#fff;font-size:15px;text-align:right;font-weight:700;border-top:1px solid #E10600;">TOTAL</td>
+        <td style="padding:14px 14px 16px;color:#E10600;font-size:18px;text-align:right;font-weight:700;border-top:1px solid #E10600;font-family:'Bebas Neue',Arial,sans-serif;letter-spacing:0.02em;">{_format_money(invoice["total"])}</td></tr>
+  </tfoot>
+</table>
+<p style="margin:18px 0 0;text-align:center;">
+  <a href="{public_url}" style="display:inline-block;background:#E10600;color:#fff;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:600;font-size:14px;letter-spacing:0.05em;">Ver factura completa →</a>
+</p>
+'''
+    info_rows = (
+        _info_row("Factura", f"<b style='color:#fff;'>{invoice['number']}</b>")
+        + _info_row("Cliente", invoice["client_name"])
+        + _info_row("Vehículo", invoice["vehicle"])
+        + _info_row("Servicio", invoice["service"])
+        + (_info_row("Técnico", invoice["technician_name"]) if invoice.get("technician_name") else "")
+    )
+
+    html = _wrapper(
+        title=f"Factura {invoice['number']}",
+        intro=(
+            f"Hola <b style='color:#fff;'>{invoice['client_name'].split()[0]}</b>, gracias por confiar en nosotros. "
+            "Adjuntamos el detalle del trabajo realizado en tu vehículo."
+        ),
+        content_html=_details_table(info_rows) + content,
+        footer_note="Si tienes alguna duda sobre esta factura, contáctanos por teléfono o WhatsApp.",
+    )
+
+    await _send(invoice["client_email"], f"Factura {invoice['number']} — El Punto Autoservices", html)
+    if ADMIN_NOTIFY:
+        await _send(ADMIN_NOTIFY, f"[Copia Admin] Factura enviada — {invoice['number']}", html)

@@ -193,6 +193,75 @@ class AssignTechnician(BaseModel):
     technician_id: Optional[str] = None
 
 
+class InvoiceItemIn(BaseModel):
+    description: str = Field(min_length=1, max_length=300)
+    quantity: float = Field(default=1, ge=0)
+    unit_price: float = Field(default=0, ge=0)
+
+
+class InvoiceItemOut(InvoiceItemIn):
+    total: float
+
+
+class InvoiceIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    work_performed: str = Field(default="", max_length=4000)
+    items: List[InvoiceItemIn] = Field(default_factory=list)
+    tax_rate: float = Field(default=0.18, ge=0, le=1)
+    discount: float = Field(default=0, ge=0)
+    notes: str = Field(default="", max_length=1000)
+
+
+class InvoiceOut(BaseModel):
+    id: str
+    number: str
+    appointment_id: str
+    client_name: str
+    client_email: EmailStr
+    client_phone: str
+    vehicle: str
+    service: str
+    technician_name: Optional[str] = None
+    work_performed: str
+    items: List[InvoiceItemOut]
+    subtotal: float
+    tax_rate: float
+    tax_amount: float
+    discount: float
+    total: float
+    status: str  # draft | sent | paid | cancelled
+    notes: str
+    created_at: str
+    sent_at: Optional[str] = None
+    paid_at: Optional[str] = None
+
+
+class InvoiceStatusUpdate(BaseModel):
+    status: Literal["draft", "sent", "paid", "cancelled"]
+
+
+def _compute_invoice_totals(items: List[dict], tax_rate: float, discount: float) -> tuple:
+    items_out = []
+    subtotal = 0.0
+    for it in items:
+        qty = float(it.get("quantity", 1) or 0)
+        price = float(it.get("unit_price", 0) or 0)
+        total = round(qty * price, 2)
+        items_out.append({
+            "description": it["description"].strip(),
+            "quantity": qty,
+            "unit_price": price,
+            "total": total,
+        })
+        subtotal += total
+    subtotal = round(subtotal, 2)
+    discount = round(min(discount, subtotal), 2)
+    taxable = max(subtotal - discount, 0)
+    tax_amount = round(taxable * tax_rate, 2)
+    total = round(taxable + tax_amount, 2)
+    return items_out, subtotal, tax_amount, total
+
+
 # ------------------------------------------------------------
 # Services data (static)
 # ------------------------------------------------------------
@@ -415,6 +484,150 @@ async def delete_technician(tech_id: str, admin=Depends(get_current_admin)):
 
 
 # ------------------------------------------------------------
+# Routes — Admin / Invoices
+# ------------------------------------------------------------
+async def _next_invoice_number() -> str:
+    year = datetime.now(timezone.utc).year
+    counter = await db.counters.find_one_and_update(
+        {"_id": f"invoice_{year}"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True,
+    )
+    seq = (counter or {}).get("seq", 1)
+    return f"EP-{year}-{seq:04d}"
+
+
+def _serialize_invoice(doc: dict) -> dict:
+    out = {**doc}
+    out.pop("_id", None)
+    return out
+
+
+@api.get("/admin/invoices", response_model=List[InvoiceOut])
+async def list_invoices(admin=Depends(get_current_admin)):
+    items = await db.invoices.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return [InvoiceOut(**i) for i in items]
+
+
+@api.get("/admin/appointments/{appt_id}/invoice", response_model=InvoiceOut)
+async def get_appointment_invoice(appt_id: str, admin=Depends(get_current_admin)):
+    inv = await db.invoices.find_one({"appointment_id": appt_id}, {"_id": 0})
+    if not inv:
+        raise HTTPException(status_code=404, detail="No invoice")
+    return InvoiceOut(**inv)
+
+
+@api.post("/admin/appointments/{appt_id}/invoice", response_model=InvoiceOut)
+async def create_or_update_invoice(appt_id: str, payload: InvoiceIn, admin=Depends(get_current_admin)):
+    appt = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    items_data = [it.model_dump() for it in payload.items]
+    items_out, subtotal, tax_amount, total = _compute_invoice_totals(items_data, payload.tax_rate, payload.discount)
+
+    existing = await db.invoices.find_one({"appointment_id": appt_id}, {"_id": 0})
+    now = datetime.now(timezone.utc).isoformat()
+    if existing:
+        update = {
+            "client_name": appt["name"],
+            "client_email": appt["email"],
+            "client_phone": appt["phone"],
+            "vehicle": appt["vehicle"],
+            "service": appt["service"],
+            "technician_name": appt.get("technician_name"),
+            "work_performed": payload.work_performed.strip(),
+            "items": items_out,
+            "subtotal": subtotal,
+            "tax_rate": payload.tax_rate,
+            "tax_amount": tax_amount,
+            "discount": payload.discount,
+            "total": total,
+            "notes": payload.notes.strip(),
+        }
+        await db.invoices.update_one({"id": existing["id"]}, {"$set": update})
+        inv = await db.invoices.find_one({"id": existing["id"]}, {"_id": 0})
+        return InvoiceOut(**inv)
+    else:
+        number = await _next_invoice_number()
+        doc = {
+            "id": str(uuid.uuid4()),
+            "number": number,
+            "appointment_id": appt_id,
+            "client_name": appt["name"],
+            "client_email": appt["email"],
+            "client_phone": appt["phone"],
+            "vehicle": appt["vehicle"],
+            "service": appt["service"],
+            "technician_name": appt.get("technician_name"),
+            "work_performed": payload.work_performed.strip(),
+            "items": items_out,
+            "subtotal": subtotal,
+            "tax_rate": payload.tax_rate,
+            "tax_amount": tax_amount,
+            "discount": payload.discount,
+            "total": total,
+            "status": "draft",
+            "notes": payload.notes.strip(),
+            "created_at": now,
+            "sent_at": None,
+            "paid_at": None,
+        }
+        await db.invoices.insert_one(doc)
+        return InvoiceOut(**doc)
+
+
+@api.patch("/admin/invoices/{invoice_id}/status")
+async def update_invoice_status(invoice_id: str, body: InvoiceStatusUpdate, admin=Depends(get_current_admin)):
+    now = datetime.now(timezone.utc).isoformat()
+    update = {"status": body.status}
+    if body.status == "sent":
+        update["sent_at"] = now
+    elif body.status == "paid":
+        update["paid_at"] = now
+    res = await db.invoices.update_one({"id": invoice_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
+@api.delete("/admin/invoices/{invoice_id}")
+async def delete_invoice(invoice_id: str, admin=Depends(get_current_admin)):
+    res = await db.invoices.delete_one({"id": invoice_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
+@api.post("/admin/invoices/{invoice_id}/send-email")
+async def send_invoice_email(invoice_id: str, background: BackgroundTasks, admin=Depends(get_current_admin)):
+    inv = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not inv:
+        raise HTTPException(status_code=404, detail="Not found")
+    public_url = _build_invoice_public_url(inv["id"])
+    background.add_task(emailer.send_invoice_email, inv, public_url)
+    await db.invoices.update_one({"id": invoice_id}, {"$set": {"status": "sent", "sent_at": datetime.now(timezone.utc).isoformat()}})
+    return {"ok": True}
+
+
+def _build_invoice_public_url(invoice_id: str) -> str:
+    base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    if not base:
+        # Fallback: relative path. Email will use this; admin UI will rebuild absolute URL client-side.
+        return f"/invoice/{invoice_id}"
+    return f"{base}/invoice/{invoice_id}"
+
+
+# Public route for clients to view invoice (no auth, unguessable UUID)
+@api.get("/public/invoices/{invoice_id}", response_model=InvoiceOut)
+async def public_invoice(invoice_id: str):
+    inv = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not inv:
+        raise HTTPException(status_code=404, detail="Not found")
+    return InvoiceOut(**inv)
+
+
+# ------------------------------------------------------------
 # Startup
 # ------------------------------------------------------------
 async def seed_admin() -> None:
@@ -442,6 +655,8 @@ async def startup() -> None:
     await db.contacts.create_index("created_at")
     await db.appointments.create_index("created_at")
     await db.technicians.create_index("created_at")
+    await db.invoices.create_index("created_at")
+    await db.invoices.create_index("appointment_id")
     await seed_admin()
 
 
