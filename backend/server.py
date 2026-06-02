@@ -164,10 +164,33 @@ class AppointmentOut(BaseModel):
     notes: str
     status: str
     created_at: str
+    technician_id: Optional[str] = None
+    technician_name: Optional[str] = None
 
 
 class StatusUpdate(BaseModel):
     status: Literal["new", "in_progress", "completed", "cancelled", "contacted"]
+
+
+class TechnicianIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = Field(min_length=1, max_length=120)
+    phone: str = Field(default="", max_length=40)
+    specialty: str = Field(default="", max_length=120)
+    active: bool = True
+
+
+class TechnicianOut(BaseModel):
+    id: str
+    name: str
+    phone: str
+    specialty: str
+    active: bool
+    created_at: str
+
+
+class AssignTechnician(BaseModel):
+    technician_id: Optional[str] = None
 
 
 # ------------------------------------------------------------
@@ -228,6 +251,8 @@ async def create_appointment(payload: AppointmentIn, background: BackgroundTasks
         "time": payload.time,
         "notes": (payload.notes or "").strip(),
         "status": "new",
+        "technician_id": None,
+        "technician_name": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.appointments.insert_one(doc)
@@ -323,6 +348,72 @@ async def delete_appointment(appt_id: str, admin=Depends(get_current_admin)):
     return {"ok": True}
 
 
+@api.patch("/admin/appointments/{appt_id}/assign")
+async def assign_appointment_technician(appt_id: str, body: AssignTechnician, admin=Depends(get_current_admin)):
+    appt = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    if body.technician_id:
+        tech = await db.technicians.find_one({"id": body.technician_id}, {"_id": 0})
+        if not tech:
+            raise HTTPException(status_code=404, detail="Technician not found")
+        update = {"technician_id": tech["id"], "technician_name": tech["name"]}
+    else:
+        update = {"technician_id": None, "technician_name": None}
+    await db.appointments.update_one({"id": appt_id}, {"$set": update})
+    return {"ok": True, **update}
+
+
+# ------------------------------------------------------------
+# Routes — Admin / Technicians
+# ------------------------------------------------------------
+@api.get("/admin/technicians", response_model=List[TechnicianOut])
+async def list_technicians(admin=Depends(get_current_admin)):
+    items = await db.technicians.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return [TechnicianOut(**i) for i in items]
+
+
+@api.post("/admin/technicians", response_model=TechnicianOut)
+async def create_technician(payload: TechnicianIn, admin=Depends(get_current_admin)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": payload.name.strip(),
+        "phone": (payload.phone or "").strip(),
+        "specialty": (payload.specialty or "").strip(),
+        "active": payload.active,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.technicians.insert_one(doc)
+    return TechnicianOut(**doc)
+
+
+@api.patch("/admin/technicians/{tech_id}", response_model=TechnicianOut)
+async def update_technician(tech_id: str, payload: TechnicianIn, admin=Depends(get_current_admin)):
+    update = {
+        "name": payload.name.strip(),
+        "phone": (payload.phone or "").strip(),
+        "specialty": (payload.specialty or "").strip(),
+        "active": payload.active,
+    }
+    res = await db.technicians.update_one({"id": tech_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    # If name changed, propagate to existing appointments
+    await db.appointments.update_many({"technician_id": tech_id}, {"$set": {"technician_name": update["name"]}})
+    tech = await db.technicians.find_one({"id": tech_id}, {"_id": 0})
+    return TechnicianOut(**tech)
+
+
+@api.delete("/admin/technicians/{tech_id}")
+async def delete_technician(tech_id: str, admin=Depends(get_current_admin)):
+    res = await db.technicians.delete_one({"id": tech_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    # Unassign from any appointment
+    await db.appointments.update_many({"technician_id": tech_id}, {"$set": {"technician_id": None, "technician_name": None}})
+    return {"ok": True}
+
+
 # ------------------------------------------------------------
 # Startup
 # ------------------------------------------------------------
@@ -350,6 +441,7 @@ async def startup() -> None:
     await db.users.create_index("email", unique=True)
     await db.contacts.create_index("created_at")
     await db.appointments.create_index("created_at")
+    await db.technicians.create_index("created_at")
     await seed_admin()
 
 
