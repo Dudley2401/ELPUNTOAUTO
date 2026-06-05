@@ -446,13 +446,3 @@ function FilterChip({ active, onClick, children, accent }) {
 
 const Th = ({ children }) => <th className="text-left px-5 py-3 font-medium">{children}</th>;
 const Td = ({ children, className = "" }) => <td className={`px-5 py-4 ${className}`}>{children}</td>;
-xt-white"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-const Th = ({ children }) => <th className="text-left px-5 py-3 font-medium">{children}</th>;
-const Td = ({ children, className = "" }) => <td className={`px-5 py-4 ${className}`}>{children}</td>;
