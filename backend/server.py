@@ -675,6 +675,138 @@ async def public_invoice(invoice_id: str):
 
 
 # ------------------------------------------------------------
+# Routes — Admin / Products & Inventory
+# ------------------------------------------------------------
+def _product_to_out(p: dict) -> ProductOut:
+    return ProductOut(
+        id=p["id"], name=p["name"], sku=p.get("sku", ""), category=p.get("category", "general"),
+        unit=p.get("unit", "unidad"), cost=p.get("cost", 0), price=p.get("price", 0),
+        current_stock=p.get("current_stock", 0), min_stock=p.get("min_stock", 0),
+        notes=p.get("notes", ""), low_stock=p.get("current_stock", 0) <= p.get("min_stock", 0),
+        created_at=p["created_at"], updated_at=p.get("updated_at", p["created_at"]),
+    )
+
+
+@api.get("/admin/products/low-stock", response_model=List[ProductOut])
+async def list_low_stock(admin=Depends(get_current_admin)):
+    items = await db.products.find(
+        {"$expr": {"$lte": ["$current_stock", "$min_stock"]}}, {"_id": 0}
+    ).sort("name", 1).to_list(1000)
+    return [_product_to_out(p) for p in items]
+
+
+@api.get("/admin/products", response_model=List[ProductOut])
+async def list_products(admin=Depends(get_current_admin)):
+    items = await db.products.find({}, {"_id": 0}).sort("name", 1).to_list(2000)
+    return [_product_to_out(p) for p in items]
+
+
+@api.post("/admin/products", response_model=ProductOut)
+async def create_product(payload: ProductIn, admin=Depends(get_current_admin)):
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": payload.name.strip(),
+        "sku": payload.sku.strip(),
+        "category": payload.category.strip() or "general",
+        "unit": payload.unit.strip() or "unidad",
+        "cost": payload.cost,
+        "price": payload.price,
+        "current_stock": payload.current_stock,
+        "min_stock": payload.min_stock,
+        "notes": payload.notes.strip(),
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.products.insert_one(doc)
+    return _product_to_out(doc)
+
+
+@api.patch("/admin/products/{product_id}", response_model=ProductOut)
+async def update_product(product_id: str, payload: ProductIn, background: BackgroundTasks, admin=Depends(get_current_admin)):
+    update = {
+        "name": payload.name.strip(),
+        "sku": payload.sku.strip(),
+        "category": payload.category.strip() or "general",
+        "unit": payload.unit.strip() or "unidad",
+        "cost": payload.cost,
+        "price": payload.price,
+        "current_stock": payload.current_stock,
+        "min_stock": payload.min_stock,
+        "notes": payload.notes.strip(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    res = await db.products.update_one({"id": product_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    p = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if p["current_stock"] <= p["min_stock"]:
+        background.add_task(emailer.send_low_stock_alert, p)
+    return _product_to_out(p)
+
+
+@api.delete("/admin/products/{product_id}")
+async def delete_product(product_id: str, admin=Depends(get_current_admin)):
+    res = await db.products.delete_one({"id": product_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
+async def _record_movement(product: dict, mtype: str, quantity: float, note: str, unit_cost: Optional[float] = None) -> None:
+    await db.stock_movements.insert_one({
+        "id": str(uuid.uuid4()),
+        "product_id": product["id"],
+        "product_name": product["name"],
+        "type": mtype,
+        "quantity": quantity,
+        "unit_cost": unit_cost,
+        "note": note,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@api.post("/admin/products/{product_id}/restock", response_model=ProductOut)
+async def restock_product(product_id: str, payload: StockMovementIn, admin=Depends(get_current_admin)):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Not found")
+    new_stock = product["current_stock"] + payload.quantity
+    update = {"current_stock": new_stock, "updated_at": datetime.now(timezone.utc).isoformat()}
+    if payload.unit_cost is not None and payload.unit_cost > 0:
+        update["cost"] = payload.unit_cost
+    await db.products.update_one({"id": product_id}, {"$set": update})
+    await _record_movement(product, "restock", payload.quantity, payload.note.strip(), payload.unit_cost)
+    p = await db.products.find_one({"id": product_id}, {"_id": 0})
+    return _product_to_out(p)
+
+
+@api.post("/admin/products/{product_id}/use", response_model=ProductOut)
+async def use_product(product_id: str, payload: StockMovementIn, background: BackgroundTasks, admin=Depends(get_current_admin)):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Not found")
+    new_stock = max(product["current_stock"] - payload.quantity, 0)
+    was_above = product["current_stock"] > product["min_stock"]
+    await db.products.update_one(
+        {"id": product_id},
+        {"$set": {"current_stock": new_stock, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    await _record_movement(product, "use", payload.quantity, payload.note.strip())
+    p = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if was_above and p["current_stock"] <= p["min_stock"]:
+        background.add_task(emailer.send_low_stock_alert, p)
+    return _product_to_out(p)
+
+
+@api.get("/admin/products/{product_id}/movements", response_model=List[StockMovementOut])
+async def list_product_movements(product_id: str, admin=Depends(get_current_admin)):
+    items = await db.stock_movements.find({"product_id": product_id}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [StockMovementOut(**i) for i in items]
+
+
+
+# ------------------------------------------------------------
 # Startup
 # ------------------------------------------------------------
 async def seed_admin() -> None:
