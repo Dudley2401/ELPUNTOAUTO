@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
-  SignOut, Calendar, ChatCircleText, TrendUp, Trash, ArrowLeft, Wrench, Plus, PencilSimple, X, Check, Receipt, Package,
+  SignOut, Calendar, ChatCircleText, TrendUp, Trash, ArrowLeft, Wrench, Plus, PencilSimple, X, Check, Receipt, Package, ShareNetwork,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -223,6 +223,22 @@ function AppointmentsTable({ appts, techs, onStatus, onDelete, onAssign, onInvoi
               </Td>
               <Td>
                 <div className="flex items-center gap-1">
+                  {a.tracking_token && (
+                    <button
+                      title="Compartir link de seguimiento"
+                      onClick={() => {
+                        const url = `${window.location.origin}/track/${a.tracking_token}`;
+                        const msg = encodeURIComponent(`Hola ${a.name.split(" ")[0]}, sigue el estado de tu cita en vivo aquí: ${url}`);
+                        const phone = (a.phone || "").replace(/\D/g, "");
+                        const fullPhone = phone.startsWith("1") ? phone : `1${phone}`;
+                        window.open(`https://wa.me/${fullPhone}?text=${msg}`, "_blank");
+                      }}
+                      data-testid={`appt-share-${a.id}`}
+                      className="p-1.5 text-[#25D366] hover:bg-[#25D366]/10 rounded-md transition"
+                    >
+                      <ShareNetwork size={16} weight="duotone" />
+                    </button>
+                  )}
                   <button data-testid={`appt-invoice-${a.id}`} onClick={() => onInvoice(a)} title="Factura" className="text-white/40 hover:text-[#E10600] transition p-1">
                     <Receipt size={16} weight="duotone" />
                   </button>

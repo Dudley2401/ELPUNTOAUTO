@@ -118,6 +118,14 @@ async def send_appointment_created_client(appt: dict) -> None:
         + _info_row("Hora / Time", appt["time"])
         + (_info_row("Notas / Notes", appt["notes"]) if appt.get("notes") else "")
     )
+    base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    track_link = f"{base}/track/{appt['tracking_token']}" if appt.get("tracking_token") and base else ""
+    track_btn = (
+        f'<p style="margin:18px 0 0;text-align:center;"><a href="{track_link}" '
+        f'style="display:inline-block;background:#E10600;color:#fff;text-decoration:none;'
+        f'padding:14px 28px;border-radius:999px;font-weight:600;font-size:14px;letter-spacing:0.05em;">'
+        f'🔴 Ver estado de mi cita en vivo</a></p>'
+    ) if track_link else ""
     html = _wrapper(
         title=f"¡Hola {appt['name'].split()[0]}! Recibimos tu solicitud.",
         intro=(
@@ -125,7 +133,7 @@ async def send_appointment_created_client(appt: dict) -> None:
             "y un asesor te contactará en breve para confirmarla.<br><br>"
             "<span style='color:#71717A;'>Thank you for choosing us. Your appointment is registered and an advisor will contact you soon to confirm.</span>"
         ),
-        content_html=_details_table(rows),
+        content_html=_details_table(rows) + track_btn,
         footer_note="¿Dudas? Llámanos o escríbenos por WhatsApp.<br>Questions? Call us or message us on WhatsApp.",
     )
     await _send(appt["email"], "Hemos recibido tu reserva — El Punto Autoservices", html)

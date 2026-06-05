@@ -63,19 +63,17 @@ async def scan_invoice(image_base64: str) -> dict:
         api_key=EMERGENT_LLM_KEY,
         session_id=f"invoice-scan-{uuid.uuid4()}",
         system_message=SYSTEM_PROMPT,
-    ).with_model("openai", "gpt-5.4")
+    ).with_model("openai", "gpt-4o")
     msg = UserMessage(
         text="Read this purchase invoice and return the JSON.",
         file_contents=[ImageContent(image_base64=image_base64)],
     )
-    chunks: list[str] = []
-    from emergentintegrations.llm.chat import TextDelta, StreamDone
-    async for ev in chat.stream_message(msg):
-        if isinstance(ev, TextDelta):
-            chunks.append(ev.content)
-        elif isinstance(ev, StreamDone):
-            break
-    raw = "".join(chunks)
+    try:
+        raw = await chat.send_message(msg)
+    except Exception as e:
+        logger.error("Scanner LLM error: %s", e)
+        raise ValueError(f"Error de la AI: {e}")
+    raw = raw if isinstance(raw, str) else str(raw)
     cleaned = _strip_json(raw)
     try:
         return json.loads(cleaned)

@@ -72,12 +72,58 @@ const FloatingWrench = () => (
 export default function MechanicAssistant() {
   const { t, lang } = useLang();
   const [open, setOpen] = useState(false);
+  const [chatMode, setChatMode] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [sessionId] = useState(() => {
+    const existing = localStorage.getItem("ep_chat_sid");
+    if (existing) return existing;
+    const sid = `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    localStorage.setItem("ep_chat_sid", sid);
+    return sid;
+  });
+  const chatScrollRef = useRef(null);
   const [tipIndex, setTipIndex] = useState(0);
   const [showTip, setShowTip] = useState(true);
   const [winking, setWinking] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
   const [walking, setWalking] = useState(false);
   const dismissedRef = useRef(false);
+
+  useEffect(() => {
+    if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+  }, [messages, chatLoading]);
+
+  const sendChat = async () => {
+    const text = chatInput.trim();
+    if (!text || chatLoading) return;
+    setChatInput("");
+    setMessages((m) => [...m, { role: "user", text }]);
+    setChatLoading(true);
+    try {
+      const { data } = await api.post("/chat", { session_id: sessionId, message: text });
+      setMessages((m) => [...m, { role: "assistant", text: data.reply }]);
+    } catch (e) {
+      setMessages((m) => [...m, { role: "assistant", text: lang === "es" ? "Disculpa, error técnico. Llámanos." : "Sorry, technical issue. Call us." }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const openChat = () => {
+    setChatMode(true);
+    setOpen(true);
+    setShowTip(false);
+    if (messages.length === 0) {
+      setMessages([{
+        role: "assistant",
+        text: lang === "es"
+          ? "¡Hey! Soy Pancho 🔧 Pregúntame lo que necesites: precios estimados, servicios, horarios, lo que sea."
+          : "Hey! I'm Pancho 🔧 Ask me anything: estimated prices, services, hours, whatever you need.",
+      }]);
+    }
+  };
 
   const tips = lang === "es" ? [
     { text: "¡Hola! Soy Pancho, ¿necesitas algo? 🔧", action: null },
@@ -135,6 +181,10 @@ export default function MechanicAssistant() {
   }, []);
 
   const handleAction = (action) => {
+    if (action === "chat") {
+      openChat();
+      return;
+    }
     if (!action) {
       setOpen(true);
       return;
@@ -153,12 +203,14 @@ export default function MechanicAssistant() {
   };
 
   const menuItems = lang === "es" ? [
+    { id: "chat", label: "💬 Hablar conmigo (AI)", icon: ChatCircleText, color: "#9333EA" },
     { id: "services", label: "Ver Servicios", icon: Wrench, color: "#E10600" },
     { id: "booking", label: "Reservar Cita", icon: CalendarBlank, color: "#FF4F47" },
     { id: "gallery", label: "Ver Taller", icon: Sparkle, color: "#F59E0B" },
     { id: "contact", label: "Cómo Llegar", icon: MapPin, color: "#0EA5E9" },
     { id: "call", label: "Llamar Ahora", icon: Phone, color: "#10B981" },
   ] : [
+    { id: "chat", label: "💬 Talk to me (AI)", icon: ChatCircleText, color: "#9333EA" },
     { id: "services", label: "View Services", icon: Wrench, color: "#E10600" },
     { id: "booking", label: "Book Appointment", icon: CalendarBlank, color: "#FF4F47" },
     { id: "gallery", label: "See Workshop", icon: Sparkle, color: "#F59E0B" },
@@ -260,43 +312,106 @@ export default function MechanicAssistant() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
                   transition={{ duration: 0.3, type: "spring", damping: 16 }}
-                  className="absolute left-20 sm:left-24 bottom-0 w-60 sm:w-64 rounded-2xl rounded-bl-sm bg-[#0F0F10] border border-white/10 shadow-2xl p-3"
+                  className={`absolute left-20 sm:left-24 bottom-0 ${chatMode ? "w-[300px] sm:w-[360px]" : "w-60 sm:w-64"} rounded-2xl rounded-bl-sm bg-[#0F0F10] border border-white/10 shadow-2xl p-3`}
                   style={{ boxShadow: "0 24px 60px -10px rgba(225,6,0,.4)" }}
                 >
                   <div className="flex items-center justify-between px-2 py-1 mb-2 border-b border-white/10">
                     <div>
                       <div className="font-display text-base tracking-wider text-white">¡Hola, soy Pancho!</div>
-                      <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">{lang === "es" ? "¿A dónde te llevo?" : "Where to?"}</div>
+                      <div className="text-[10px] uppercase tracking-[0.25em] text-white/40">
+                        {chatMode
+                          ? (lang === "es" ? "AI 24/7 · gratis" : "AI 24/7 · free")
+                          : (lang === "es" ? "¿A dónde te llevo?" : "Where to?")}
+                      </div>
                     </div>
-                    <button onClick={dismiss} className="text-white/40 hover:text-white" data-testid="mechanic-close">
-                      <X size={16} />
-                    </button>
+                    {chatMode ? (
+                      <button onClick={() => setChatMode(false)} className="text-white/40 hover:text-white text-xs uppercase tracking-wider">
+                        ←
+                      </button>
+                    ) : (
+                      <button onClick={dismiss} className="text-white/40 hover:text-white" data-testid="mechanic-close">
+                        <X size={16} />
+                      </button>
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    {menuItems.map((it) => {
-                      const Icon = it.icon;
-                      return (
+                  {chatMode ? (
+                    <div data-testid="pancho-chat">
+                      <div ref={chatScrollRef} className="space-y-2 max-h-[300px] sm:max-h-[380px] overflow-y-auto pr-1 pb-2">
+                        {messages.map((m, i) => (
+                          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                            <div
+                              className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-snug ${
+                                m.role === "user"
+                                  ? "bg-[#E10600] text-white rounded-br-sm"
+                                  : "bg-white/[0.07] text-white/90 rounded-bl-sm"
+                              }`}
+                            >
+                              {m.text}
+                            </div>
+                          </div>
+                        ))}
+                        {chatLoading && (
+                          <div className="flex justify-start">
+                            <div className="bg-white/[0.07] text-white/60 px-3 py-2 rounded-2xl rounded-bl-sm text-sm">
+                              <span className="inline-flex gap-1">
+                                <span className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                                <span className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: "120ms" }} />
+                                <span className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: "240ms" }} />
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <input
+                          data-testid="pancho-chat-input"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && sendChat()}
+                          placeholder={lang === "es" ? "Pregunta lo que sea…" : "Ask anything…"}
+                          className="flex-1 bg-[#0A0A0A] border border-white/10 focus:border-[#E10600] outline-none text-white rounded-full px-4 py-2 text-sm placeholder:text-white/30"
+                          disabled={chatLoading}
+                        />
                         <button
-                          key={it.id}
-                          data-testid={`mechanic-action-${it.id}`}
-                          onClick={() => handleAction(it.id)}
-                          className="w-full group flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left"
+                          onClick={sendChat}
+                          disabled={chatLoading || !chatInput.trim()}
+                          data-testid="pancho-chat-send"
+                          className="w-9 h-9 rounded-full bg-[#E10600] hover:bg-[#FF1A0E] grid place-items-center text-white disabled:opacity-50 transition"
                         >
-                          <span
-                            className="w-8 h-8 rounded-md grid place-items-center text-white"
-                            style={{ background: it.color }}
-                          >
-                            <Icon size={16} weight="bold" />
-                          </span>
-                          <span className="text-sm text-white/90 group-hover:text-white flex-1">{it.label}</span>
-                          <span className="text-white/30 group-hover:text-[#E10600] arrow-slide">→</span>
+                          <PaperPlaneRight size={14} weight="fill" />
                         </button>
-                      );
-                    })}
-                  </div>
-                  <div className="px-2 pt-2 mt-2 border-t border-white/10 text-[10px] text-white/30 flex items-center gap-1.5">
-                    <ChatCircleText size={12} /> {lang === "es" ? "Toca afuera para cerrar" : "Tap outside to close"}
-                  </div>
+                      </div>
+                      <div className="text-[10px] text-white/30 text-center mt-1.5">Powered by AI · Respuestas estimadas</div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-1">
+                        {menuItems.map((it) => {
+                          const Icon = it.icon;
+                          return (
+                            <button
+                              key={it.id}
+                              data-testid={`mechanic-action-${it.id}`}
+                              onClick={() => handleAction(it.id)}
+                              className="w-full group flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left"
+                            >
+                              <span
+                                className="w-8 h-8 rounded-md grid place-items-center text-white"
+                                style={{ background: it.color }}
+                              >
+                                <Icon size={16} weight="bold" />
+                              </span>
+                              <span className="text-sm text-white/90 group-hover:text-white flex-1">{it.label}</span>
+                              <span className="text-white/30 group-hover:text-[#E10600] arrow-slide">→</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="px-2 pt-2 mt-2 border-t border-white/10 text-[10px] text-white/30 flex items-center gap-1.5">
+                        <ChatCircleText size={12} /> {lang === "es" ? "Toca afuera para cerrar" : "Tap outside to close"}
+                      </div>
+                    </>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

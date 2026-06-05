@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 import emailer
 import invoice_scanner
+import chat_service
 
 # ------------------------------------------------------------
 # Config
@@ -167,6 +168,8 @@ class AppointmentOut(BaseModel):
     created_at: str
     technician_id: Optional[str] = None
     technician_name: Optional[str] = None
+    tracking_token: Optional[str] = None
+    status_history: List[dict] = Field(default_factory=list)
 
 
 class StatusUpdate(BaseModel):
@@ -355,6 +358,16 @@ class ScanInvoiceIn(BaseModel):
     image_base64: str
 
 
+class ChatIn(BaseModel):
+    session_id: str
+    message: str = Field(min_length=1, max_length=2000)
+
+
+class ChatOut(BaseModel):
+    reply: str
+    session_id: str
+
+
 def _compute_invoice_totals(items: List[dict], tax_rate: float, discount: float) -> tuple:
     items_out = []
     subtotal = 0.0
@@ -426,6 +439,7 @@ async def create_contact(payload: ContactIn, background: BackgroundTasks):
 async def create_appointment(payload: AppointmentIn, background: BackgroundTasks):
     doc = {
         "id": str(uuid.uuid4()),
+        "tracking_token": str(uuid.uuid4()),
         "name": payload.name.strip(),
         "email": payload.email.lower(),
         "phone": payload.phone.strip(),
@@ -437,6 +451,9 @@ async def create_appointment(payload: AppointmentIn, background: BackgroundTasks
         "status": "new",
         "technician_id": None,
         "technician_name": None,
+        "status_history": [
+            {"status": "new", "at": datetime.now(timezone.utc).isoformat(), "note": "Cita creada"}
+        ],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.appointments.insert_one(doc)
@@ -515,9 +532,14 @@ async def list_appointments(admin=Depends(get_current_admin)):
 
 @api.patch("/admin/appointments/{appt_id}")
 async def update_appointment(appt_id: str, body: StatusUpdate, background: BackgroundTasks, admin=Depends(get_current_admin)):
-    res = await db.appointments.update_one({"id": appt_id}, {"$set": {"status": body.status}})
-    if res.matched_count == 0:
+    appt = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
+    if not appt:
         raise HTTPException(status_code=404, detail="Not found")
+    entry = {"status": body.status, "at": datetime.now(timezone.utc).isoformat(), "note": ""}
+    await db.appointments.update_one(
+        {"id": appt_id},
+        {"$set": {"status": body.status}, "$push": {"status_history": entry}},
+    )
     appt = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
     if appt:
         background.add_task(emailer.send_appointment_status_update, appt, body.status)
@@ -1078,6 +1100,46 @@ async def delete_purchase_invoice(invoice_id: str, admin=Depends(get_current_adm
     return {"ok": True}
 
 
+# ------------------------------------------------------------
+# Routes — Public Chat (Pancho AI) + Live Tracking
+# ------------------------------------------------------------
+@api.post("/chat", response_model=ChatOut)
+async def chat(body: ChatIn):
+    sid = body.session_id or str(uuid.uuid4())
+    try:
+        reply = await chat_service.chat_reply(sid, body.message)
+    except Exception as e:
+        logger.error("Chat error: %s", e)
+        raise HTTPException(status_code=500, detail="No pude responder ahora. Llámanos al " + os.environ.get("BUSINESS_PHONE", ""))
+    # Persist messages for analytics
+    now = datetime.now(timezone.utc).isoformat()
+    await db.chat_messages.insert_many([
+        {"id": str(uuid.uuid4()), "session_id": sid, "role": "user", "text": body.message, "created_at": now},
+        {"id": str(uuid.uuid4()), "session_id": sid, "role": "assistant", "text": reply, "created_at": now},
+    ])
+    return ChatOut(reply=reply, session_id=sid)
+
+
+@api.get("/public/track/{token}")
+async def track_appointment(token: str):
+    appt = await db.appointments.find_one({"tracking_token": token}, {"_id": 0})
+    if not appt:
+        raise HTTPException(status_code=404, detail="Not found")
+    # Return masked client info
+    return {
+        "id": appt["id"],
+        "name": appt["name"],
+        "service": appt["service"],
+        "vehicle": appt["vehicle"],
+        "date": appt["date"],
+        "time": appt["time"],
+        "status": appt["status"],
+        "technician_name": appt.get("technician_name"),
+        "status_history": appt.get("status_history", []),
+        "created_at": appt["created_at"],
+    }
+
+
 
 # ------------------------------------------------------------
 # Startup
@@ -1114,6 +1176,8 @@ async def startup() -> None:
     await db.stock_movements.create_index("created_at")
     await db.suppliers.create_index("name")
     await db.purchase_invoices.create_index("created_at")
+    await db.chat_messages.create_index("session_id")
+    await db.appointments.create_index("tracking_token")
     await seed_admin()
 
 
