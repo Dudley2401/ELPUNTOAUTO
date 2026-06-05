@@ -368,6 +368,32 @@ class ChatOut(BaseModel):
     session_id: str
 
 
+# ------ Reviews ------
+class ReviewIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = Field(min_length=1, max_length=120)
+    rating: int = Field(ge=1, le=5)
+    comment: str = Field(min_length=5, max_length=1000)
+    vehicle: str = Field(default="", max_length=120)
+    service: str = Field(default="", max_length=120)
+    appointment_id: Optional[str] = None
+
+
+class ReviewOut(BaseModel):
+    id: str
+    name: str
+    rating: int
+    comment: str
+    vehicle: str
+    service: str
+    status: str
+    created_at: str
+
+
+class ReviewStatusUpdate(BaseModel):
+    status: Literal["pending", "approved", "rejected"]
+
+
 def _compute_invoice_totals(items: List[dict], tax_rate: float, discount: float) -> tuple:
     items_out = []
     subtotal = 0.0
@@ -1125,7 +1151,6 @@ async def track_appointment(token: str):
     appt = await db.appointments.find_one({"tracking_token": token}, {"_id": 0})
     if not appt:
         raise HTTPException(status_code=404, detail="Not found")
-    # Return masked client info
     return {
         "id": appt["id"],
         "name": appt["name"],
@@ -1138,6 +1163,54 @@ async def track_appointment(token: str):
         "status_history": appt.get("status_history", []),
         "created_at": appt["created_at"],
     }
+
+
+# ------------------------------------------------------------
+# Routes — Reviews
+# ------------------------------------------------------------
+@api.get("/reviews", response_model=List[ReviewOut])
+async def list_public_reviews():
+    items = await db.reviews.find({"status": "approved"}, {"_id": 0}).sort("created_at", -1).limit(20).to_list(20)
+    return [ReviewOut(**i) for i in items]
+
+
+@api.post("/reviews", response_model=ReviewOut)
+async def create_review(payload: ReviewIn):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": payload.name.strip(),
+        "rating": payload.rating,
+        "comment": payload.comment.strip(),
+        "vehicle": payload.vehicle.strip(),
+        "service": payload.service.strip(),
+        "appointment_id": payload.appointment_id,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.reviews.insert_one(doc)
+    return ReviewOut(**doc)
+
+
+@api.get("/admin/reviews", response_model=List[ReviewOut])
+async def list_admin_reviews(admin=Depends(get_current_admin)):
+    items = await db.reviews.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [ReviewOut(**i) for i in items]
+
+
+@api.patch("/admin/reviews/{review_id}")
+async def update_review_status(review_id: str, body: ReviewStatusUpdate, admin=Depends(get_current_admin)):
+    res = await db.reviews.update_one({"id": review_id}, {"$set": {"status": body.status}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
+@api.delete("/admin/reviews/{review_id}")
+async def delete_review(review_id: str, admin=Depends(get_current_admin)):
+    res = await db.reviews.delete_one({"id": review_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
 
 
 
@@ -1178,6 +1251,7 @@ async def startup() -> None:
     await db.purchase_invoices.create_index("created_at")
     await db.chat_messages.create_index("session_id")
     await db.appointments.create_index("tracking_token")
+    await db.reviews.create_index("status")
     await seed_admin()
 
 
@@ -1192,6 +1266,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origin_regex=".*",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+gex=".*",
     allow_methods=["*"],
     allow_headers=["*"],
 )
