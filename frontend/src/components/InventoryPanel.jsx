@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Plus, PencilSimple, Trash, X, Check, Package, Warning, ArrowUp, ArrowDown,
-  ClockCounterClockwise, MagnifyingGlass,
+  ClockCounterClockwise, MagnifyingGlass, MagicWand,
 } from "@phosphor-icons/react";
 import { api, formatApiErrorDetail } from "@/lib/api";
+import InvoiceScanner from "@/components/InvoiceScanner";
 
 const money = (v) => `RD$ ${Number(v || 0).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -25,6 +26,7 @@ export default function InventoryPanel() {
   const [filter, setFilter] = useState("all"); // all | low
   const [movementFor, setMovementFor] = useState(null); // { product, type: 'restock' | 'use' }
   const [historyFor, setHistoryFor] = useState(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -219,6 +221,9 @@ export default function InventoryPanel() {
       )}
       {historyFor && (
         <HistoryModal product={historyFor} onClose={() => setHistoryFor(null)} />
+      )}
+      {scannerOpen && (
+        <InvoiceScanner onClose={() => setScannerOpen(false)} onDone={() => { setScannerOpen(false); load(); }} />
       )}
     </div>
   );
@@ -432,6 +437,16 @@ function FilterChip({ active, onClick, children, accent }) {
       onClick={onClick}
       className={`px-3 py-1.5 rounded-md text-xs uppercase tracking-[0.18em] transition ${
         active ? (accent ? "bg-[#E10600] text-white" : "bg-white/10 text-white") : "text-white/50 hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+const Th = ({ children }) => <th className="text-left px-5 py-3 font-medium">{children}</th>;
+const Td = ({ children, className = "" }) => <td className={`px-5 py-4 ${className}`}>{children}</td>;
+xt-white"
       }`}
     >
       {children}

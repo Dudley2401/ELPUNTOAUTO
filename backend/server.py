@@ -18,6 +18,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 import emailer
+import invoice_scanner
 
 # ------------------------------------------------------------
 # Config
@@ -285,6 +286,73 @@ class StockMovementOut(BaseModel):
     unit_cost: Optional[float] = None
     note: str
     created_at: str
+
+
+# ------ Suppliers / Purchase Invoices ------
+class SupplierIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = Field(min_length=1, max_length=200)
+    phone: str = Field(default="", max_length=40)
+    rnc: str = Field(default="", max_length=40)
+    notes: str = Field(default="", max_length=500)
+
+
+class SupplierOut(BaseModel):
+    id: str
+    name: str
+    phone: str
+    rnc: str
+    notes: str
+    created_at: str
+
+
+class PurchaseItemIn(BaseModel):
+    description: str = Field(min_length=1, max_length=300)
+    quantity: float = Field(default=1, ge=0)
+    unit_price: float = Field(default=0, ge=0)
+    unit: str = Field(default="unidad")
+    product_id: Optional[str] = None  # link to existing product, or None to create new
+
+
+class PurchaseItemOut(BaseModel):
+    description: str
+    quantity: float
+    unit_price: float
+    unit: str
+    total: float
+    product_id: Optional[str] = None
+    product_name: Optional[str] = None
+
+
+class PurchaseInvoiceIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    supplier_id: Optional[str] = None
+    supplier_name: str = Field(min_length=1, max_length=200)
+    supplier_phone: str = Field(default="", max_length=40)
+    supplier_rnc: str = Field(default="", max_length=40)
+    invoice_number: str = Field(default="", max_length=80)
+    date: str = Field(default="")
+    items: List[PurchaseItemIn] = Field(default_factory=list)
+    notes: str = Field(default="", max_length=500)
+
+
+class PurchaseInvoiceOut(BaseModel):
+    id: str
+    supplier_id: str
+    supplier_name: str
+    supplier_phone: str
+    supplier_rnc: str
+    invoice_number: str
+    date: str
+    items: List[PurchaseItemOut]
+    subtotal: float
+    total: float
+    notes: str
+    created_at: str
+
+
+class ScanInvoiceIn(BaseModel):
+    image_base64: str
 
 
 def _compute_invoice_totals(items: List[dict], tax_rate: float, discount: float) -> tuple:
@@ -805,6 +873,211 @@ async def list_product_movements(product_id: str, admin=Depends(get_current_admi
     return [StockMovementOut(**i) for i in items]
 
 
+# ------------------------------------------------------------
+# Routes — Suppliers
+# ------------------------------------------------------------
+@api.get("/admin/suppliers", response_model=List[SupplierOut])
+async def list_suppliers(admin=Depends(get_current_admin)):
+    items = await db.suppliers.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
+    return [SupplierOut(**i) for i in items]
+
+
+@api.post("/admin/suppliers", response_model=SupplierOut)
+async def create_supplier(payload: SupplierIn, admin=Depends(get_current_admin)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": payload.name.strip(),
+        "phone": payload.phone.strip(),
+        "rnc": payload.rnc.strip(),
+        "notes": payload.notes.strip(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.suppliers.insert_one(doc)
+    return SupplierOut(**doc)
+
+
+@api.patch("/admin/suppliers/{supplier_id}", response_model=SupplierOut)
+async def update_supplier(supplier_id: str, payload: SupplierIn, admin=Depends(get_current_admin)):
+    update = {
+        "name": payload.name.strip(),
+        "phone": payload.phone.strip(),
+        "rnc": payload.rnc.strip(),
+        "notes": payload.notes.strip(),
+    }
+    res = await db.suppliers.update_one({"id": supplier_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    s = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0})
+    return SupplierOut(**s)
+
+
+@api.delete("/admin/suppliers/{supplier_id}")
+async def delete_supplier(supplier_id: str, admin=Depends(get_current_admin)):
+    res = await db.suppliers.delete_one({"id": supplier_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
+# ------------------------------------------------------------
+# Routes — Purchase Invoices (compras a proveedores)
+# ------------------------------------------------------------
+@api.post("/admin/inventory/scan-invoice")
+async def scan_purchase_invoice(payload: ScanInvoiceIn, admin=Depends(get_current_admin)):
+    try:
+        result = await invoice_scanner.scan_invoice(payload.image_base64)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error escaneando: {e}")
+    if isinstance(result, dict) and result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    # Try to match supplier by name to suggest
+    suggested_supplier_id = None
+    name = (result.get("supplier_name") or "").strip().lower()
+    if name:
+        existing = await db.suppliers.find_one(
+            {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0}
+        )
+        if existing:
+            suggested_supplier_id = existing["id"]
+    # Try to match each item to existing products by name (fuzzy contains)
+    all_products = await db.products.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(2000)
+    products_lookup = [(p["id"], p["name"], p["name"].lower()) for p in all_products]
+    items = result.get("items", []) or []
+    enriched_items = []
+    for it in items:
+        desc = (it.get("description") or "").strip()
+        match_id = None
+        desc_l = desc.lower()
+        for pid, pname, pname_l in products_lookup:
+            if pname_l == desc_l or pname_l in desc_l or desc_l in pname_l:
+                match_id = pid
+                break
+        enriched_items.append({
+            "description": desc,
+            "quantity": float(it.get("quantity") or 1),
+            "unit_price": float(it.get("unit_price") or 0),
+            "unit": (it.get("unit") or "unidad").strip() or "unidad",
+            "product_id": match_id,
+        })
+    return {
+        "supplier_name": result.get("supplier_name") or "",
+        "supplier_phone": result.get("supplier_phone") or "",
+        "supplier_rnc": result.get("supplier_rnc") or "",
+        "suggested_supplier_id": suggested_supplier_id,
+        "invoice_number": result.get("invoice_number") or "",
+        "date": result.get("date") or "",
+        "currency": result.get("currency") or "DOP",
+        "items": enriched_items,
+        "subtotal": result.get("subtotal"),
+        "total": result.get("total"),
+        "notes": result.get("notes") or "",
+    }
+
+
+import re  # noqa: E402  (used by scan_purchase_invoice above)
+
+
+@api.get("/admin/purchase-invoices", response_model=List[PurchaseInvoiceOut])
+async def list_purchase_invoices(admin=Depends(get_current_admin)):
+    items = await db.purchase_invoices.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return [PurchaseInvoiceOut(**i) for i in items]
+
+
+@api.post("/admin/purchase-invoices", response_model=PurchaseInvoiceOut)
+async def create_purchase_invoice(payload: PurchaseInvoiceIn, background: BackgroundTasks, admin=Depends(get_current_admin)):
+    # Resolve / create supplier
+    supplier = None
+    if payload.supplier_id:
+        supplier = await db.suppliers.find_one({"id": payload.supplier_id}, {"_id": 0})
+    if not supplier:
+        supplier = {
+            "id": str(uuid.uuid4()),
+            "name": payload.supplier_name.strip(),
+            "phone": payload.supplier_phone.strip(),
+            "rnc": payload.supplier_rnc.strip(),
+            "notes": "",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.suppliers.insert_one(supplier)
+
+    # Process each item: link to existing product or create a new one, then add stock
+    items_out: list = []
+    subtotal = 0.0
+    low_stock_alerts: list = []
+    for it in payload.items:
+        qty = float(it.quantity)
+        price = float(it.unit_price)
+        unit = it.unit or "unidad"
+        line_total = round(qty * price, 2)
+        subtotal += line_total
+
+        if it.product_id:
+            prod = await db.products.find_one({"id": it.product_id}, {"_id": 0})
+        else:
+            prod = None
+        if not prod:
+            # Create new product
+            prod = {
+                "id": str(uuid.uuid4()),
+                "name": it.description.strip(),
+                "sku": "",
+                "category": "Otros",
+                "unit": unit,
+                "cost": price,
+                "price": round(price * 1.4, 2),  # default 40% markup
+                "current_stock": 0,
+                "min_stock": 0,
+                "notes": "",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.products.insert_one(prod)
+
+        # Apply restock
+        new_stock = float(prod.get("current_stock", 0)) + qty
+        update = {"current_stock": new_stock, "updated_at": datetime.now(timezone.utc).isoformat()}
+        if price > 0:
+            update["cost"] = price
+        await db.products.update_one({"id": prod["id"]}, {"$set": update})
+        await _record_movement(prod, "restock", qty, f"Factura {payload.invoice_number or '—'} - {supplier['name']}", price)
+
+        items_out.append({
+            "description": it.description.strip(),
+            "quantity": qty,
+            "unit_price": price,
+            "unit": unit,
+            "total": line_total,
+            "product_id": prod["id"],
+            "product_name": prod["name"],
+        })
+
+    subtotal = round(subtotal, 2)
+    doc = {
+        "id": str(uuid.uuid4()),
+        "supplier_id": supplier["id"],
+        "supplier_name": supplier["name"],
+        "supplier_phone": supplier.get("phone", ""),
+        "supplier_rnc": supplier.get("rnc", ""),
+        "invoice_number": payload.invoice_number.strip(),
+        "date": payload.date.strip() or datetime.now(timezone.utc).date().isoformat(),
+        "items": items_out,
+        "subtotal": subtotal,
+        "total": subtotal,
+        "notes": payload.notes.strip(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.purchase_invoices.insert_one(doc)
+    return PurchaseInvoiceOut(**doc)
+
+
+@api.delete("/admin/purchase-invoices/{invoice_id}")
+async def delete_purchase_invoice(invoice_id: str, admin=Depends(get_current_admin)):
+    res = await db.purchase_invoices.delete_one({"id": invoice_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
 
 # ------------------------------------------------------------
 # Startup
@@ -839,6 +1112,8 @@ async def startup() -> None:
     await db.products.create_index("name")
     await db.stock_movements.create_index("product_id")
     await db.stock_movements.create_index("created_at")
+    await db.suppliers.create_index("name")
+    await db.purchase_invoices.create_index("created_at")
     await seed_admin()
 
 
